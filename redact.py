@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Claude Code PostToolUse hook: redact secrets from tool output before the model sees it.
+"""Claude Code hooks that keep secrets away from the model.
 
-Reads the hook event (JSON) on stdin. If any string in `tool_response` contains a secret,
-prints a `hookSpecificOutput.updatedToolOutput` with the same structure and the secrets
-replaced by `[REDACTED:<kind>]`. Prints nothing when there is nothing to redact.
+    redact.py output   PostToolUse: if any string in `tool_response` contains a secret, prints a
+                       `hookSpecificOutput.updatedToolOutput` with the same structure and the secrets
+                       replaced by `[REDACTED:<kind>]`.
+    redact.py prompt   UserPromptSubmit: if the prompt contains a secret (for example something pasted
+                       by accident), blocks it before it reaches the model and says which kinds were
+                       found, never the values. Claude Code cannot rewrite a prompt, only block it.
+                       Put `[allow-secrets]` anywhere in the prompt to send it anyway.
 
-Never fails loudly: on any error it exits 0 without output, so the tool result passes
-through unchanged (fail-open). Standard library only.
+Both read the hook event (JSON) on stdin and print nothing when there is nothing to do.
+Never fails loudly: on any error it exits 0 without output, so the event passes through
+unchanged (fail-open). Standard library only.
 """
 from __future__ import annotations
 
@@ -87,21 +92,49 @@ def build_output(event: dict, known: list[str]) -> dict | None:
     redacted = redact_value(event["tool_response"], known, counts)
     if not counts:
         return None
-    summary = ", ".join(f"{kind} x{n}" for kind, n in sorted(counts.items()))
     return {
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
             "updatedToolOutput": redacted,
-            "additionalContext": f"Secret redaction hook replaced values in this tool output: {summary}.",
+            "additionalContext": f"Secret redaction hook replaced values in this tool output: {summarise(counts)}.",
         }
     }
 
 
-def main() -> int:
+ALLOW_MARKER = "[allow-secrets]"
+
+
+def summarise(counts: dict[str, int]) -> str:
+    return ", ".join(f"{kind} x{n}" for kind, n in sorted(counts.items()))
+
+
+def build_prompt_block(event: dict, known: list[str]) -> dict | None:
+    prompt = event.get("prompt")
+    if not isinstance(prompt, str) or ALLOW_MARKER in prompt:
+        return None
+    counts: dict[str, int] = {}
+    redact_text(prompt, known, counts)
+    if not counts:
+        return None
+    return {
+        "decision": "block",
+        "reason": (f"Prompt not sent: it looks like it contains a secret ({summarise(counts)}). "
+                   f"Remove it and send again, or add {ALLOW_MARKER} to the prompt to send it as it is. "
+                   "The text may still be in your local prompt history and session transcript."),
+        "hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "suppressOriginalPrompt": True},
+    }
+
+
+MODES = {"output": build_output, "prompt": build_prompt_block}
+
+
+def main(argv: list[str] | None = None) -> int:
     try:
+        args = sys.argv[1:] if argv is None else argv
+        build = MODES[args[0] if args else "output"]
         event = json.load(sys.stdin)
         known = load_known_secrets(os.environ.get("CLAUDE_REDACT_SECRETS_FILE", DEFAULT_SECRETS_FILE))
-        output = build_output(event, known)
+        output = build(event, known)
         if output is not None:
             sys.stdout.write(json.dumps(output))
     except Exception:  # fail-open: never break the tool call

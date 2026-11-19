@@ -1,6 +1,7 @@
 # claude-code-redact
 
-Claude Code `PostToolUse` hook that redacts secrets from tool output before the model sees it. Public repository
+Claude Code hooks that keep secrets away from the model: `redact.py output` (PostToolUse, redacts tool output) and
+`redact.py prompt` (UserPromptSubmit, blocks prompts with pasted secrets). Public repository
 (MIT): never commit real secrets, personal paths or details about the maintainer's infrastructure; test values are
 fake and assembled at runtime.
 
@@ -24,5 +25,5 @@ This project follows these conventions:
 ## Commands / Setup
 
 - Tests: `python -I -m unittest discover -s tests`
-- The installed copy lives in `~/.claude/hooks/redact_output.py`; after changing `redact_output.py`, copy it there again.
+- The installed copy lives in `~/.claude/hooks/redact.py`; after changing `redact.py`, copy it there again.
 - Standard library only, Python 3.9+. Keep it a single file.

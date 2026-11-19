@@ -7,7 +7,7 @@ import unittest
 from contextlib import redirect_stdout
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import redact_output as r  # noqa: E402
+import redact as r  # noqa: E402
 
 # Test values are assembled at runtime so this file itself trips no secret scanner.
 WEBHOOK = "https://discord.com/api/webhooks/" + "123456789012345678/" + "AbCdEf_GhIjKlMnOpQrStUvWxYz0123456789"
@@ -79,7 +79,7 @@ class StructureTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def run_main(self, stdin_text, secrets=None):
+    def run_main(self, stdin_text, secrets=None, mode=("output",)):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "known.txt")
             with open(path, "w", encoding="utf-8") as handle:
@@ -89,7 +89,7 @@ class MainTests(unittest.TestCase):
             sys.stdin, buffer = io.StringIO(stdin_text), io.StringIO()
             try:
                 with redirect_stdout(buffer):
-                    code = r.main()
+                    code = r.main(mode)
             finally:
                 sys.stdin = old_stdin
                 if old_env is None:
@@ -107,6 +107,31 @@ class MainTests(unittest.TestCase):
 
     def test_bad_input_fails_open(self):
         self.assertEqual(self.run_main("not json"), (0, ""))
+        self.assertEqual(self.run_main("{}", mode=("unknown-mode",)), (0, ""))
+
+
+class PromptTests(unittest.TestCase):
+    def test_blocks_pasted_secret_without_echoing_it(self):
+        out = r.build_prompt_block({"prompt": "here is my config:\n" + WEBHOOK}, [])
+        self.assertEqual(out["decision"], "block")
+        self.assertIn("discord-webhook", out["reason"])
+        self.assertNotIn(WEBHOOK, json.dumps(out))
+        self.assertTrue(out["hookSpecificOutput"]["suppressOriginalPrompt"])
+        self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit")
+
+    def test_known_confidential_term(self):
+        out = r.build_prompt_block({"prompt": "the codename is ProjectBluebird"}, ["ProjectBluebird"])
+        self.assertIn("known x1", out["reason"])
+
+    def test_clean_prompt_and_allow_marker_pass(self):
+        self.assertIsNone(r.build_prompt_block({"prompt": "upgrade the caddy build"}, []))
+        self.assertIsNone(r.build_prompt_block({"prompt": "[allow-secrets] test with " + GITHUB}, []))
+        self.assertIsNone(r.build_prompt_block({}, []))
+
+    def test_prompt_mode_via_main(self):
+        code, out = MainTests().run_main(json.dumps({"prompt": "key " + AWS}), mode=("prompt",))
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["decision"], "block")
 
 
 if __name__ == "__main__":
