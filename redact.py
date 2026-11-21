@@ -42,6 +42,8 @@ PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ("slack-token", re.compile(r"\bxox[abprs]-[\w-]{10,}"), "[REDACTED:slack-token]"),
     ("stripe-key", re.compile(r"\b(?:sk|rk)_live_[A-Za-z0-9]{20,}"), "[REDACTED:stripe-key]"),
     ("telegram-bot-token", re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{35}\b"), "[REDACTED:telegram-bot-token]"),
+    # Cloudflare API tokens with a prefix (cfut_ user, cfat_ account)
+    ("cloudflare-token", re.compile(r"\bcf(?:ut|at)_[A-Za-z0-9]{40,}"), "[REDACTED:cloudflare-token]"),
     ("bearer", re.compile(r"(?i)(\bBearer\s+)[A-Za-z0-9._~+/=-]{16,}"), r"\1[REDACTED:bearer]"),
     # key=value / key: value with a secret-looking key. Skips placeholders such as $VAR, ${VAR}, <x>, ***.
     ("assignment", re.compile(

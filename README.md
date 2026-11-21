@@ -43,6 +43,7 @@ One file, `redact.py`, standard library only, no dependencies.
 | `github-token`, `gitlab-token` | `ghp_…`, `gho_…`, `github_pat_…`, `glpat-…` |
 | `aws-access-key`, `google-api-key` | `AKIA…`, `ASIA…`, `AIza…` |
 | `slack-token`, `stripe-key`, `telegram-bot-token` | `xoxb-…`, `sk_live_…`, `123456789:AA…` |
+| `cloudflare-token` | `cfut_…`, `cfat_…` |
 | `bearer` | `Bearer <token>` |
 | `assignment` | `PASSWORD=…`, `api_key: …`, `"client_secret": "…"` (values of 8+ characters; `$VAR`, `${VAR}`, `<x>` are left alone) |
 | `known` | any exact value you list in a local file (see below) |

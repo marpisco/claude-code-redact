@@ -28,6 +28,7 @@ class PatternTests(unittest.TestCase):
             WEBHOOK: "discord-webhook",
             GITHUB: "github-token",
             AWS: "aws-access-key",
+            "cfut" + "_" + "Ab1" * 16: "cloudflare-token",
             JWT: "jwt",
             PEM: "private-key",
             "Authorization: Bearer " + "x" * 30: "bearer",
